@@ -129,7 +129,9 @@ contract DSCEngine is ReentracyGuard {
         address tokenCollateralAddress,
         uint256 amountCollateral,
         uint256 amountDscToMint 
-        ) external {
+     ) 
+    external
+   {
     depositeCollateral(tokenCollateralAddress, amountCollateral);
     mintDsc(amountDscToMint);
     }
@@ -158,17 +160,27 @@ contract DSCEngine is ReentracyGuard {
 
   // in order to redeem collateral
   // 1. health factor must be over 1 AFTER collateral pulled out                                             
-   function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn , uint256 amountDscToBurn) external{
-     burnDsc(amountDscToBurn);
-     redeemCollateral(tokenCollateralAddress, amountCollateral)
+   function redeemCollateralForDsc(
+        address tokenCollateralAddress, 
+        uint256 amountCollateral, 
+        uint256 amountDscToBurn
+     ) 
+         external
+         moreThanZero(amountCollateral)
+         isAllowedToken(tokenCollateralAddress)
+   {
+     _burnDsc(amountDscToBurn, msg.sender, msg.sender);
+     _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+     _revertIfHealthFactorIsBroken(msg.sender);
    };
 
    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) 
-   public
+   external
    moreThanZero(amountCollateral)
    nonReentrant
+   isAllowedToken(tokenCollateralAddress)
    {
-      _redeemCollateral(msg.sender, msg.sender , tokenCollateralAddress, amountCollateral);
+      _redeemCollateral( tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
       _revertIfHealthFactorIsBroken(msg.sender);
    }
 
@@ -182,9 +194,15 @@ contract DSCEngine is ReentracyGuard {
     }
    };
 
-   function burnDsc(uint256 amount) public moreThanZero(amount){
+     /*
+     * @notice careful! You'll burn your DSC here! Make sure you want to do this...
+     * @dev you might want to use this if you're nervous you might get liquidated and want to just burn
+     * your DSC but keep your collateral in.
+     */
+
+   function burnDsc(uint256 amount) public moreThanZero(amount){   
     _burnDsc( amount,  msg.sender, msg.sender);  
-      _revertIfHealthFactorIsBroken(msg.sender);
+      _revertIfHealthFactorIsBroken(msg.sender);  // I don't think thiss would ever hit''
    };
    
    // if we do start nearing undercollateralization, we need someone to liquidate positions
@@ -198,6 +216,7 @@ contract DSCEngine is ReentracyGuard {
     * For example, if the price of the collateral plummeted before anyone could be liquidated.    */
    function liquidate(address collateral, address user, uint256 debtToCover) external
    moreThanZero(debtToCover)
+   isAllowedToken(collateral)
    nonReentrant
    {
     // need to check health factor of the user
@@ -218,7 +237,7 @@ contract DSCEngine is ReentracyGuard {
     // 0.05 * 0.1 = 0.005.
     uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS)/ LIQUIDATION_PRECISION;
     uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral; 
-    _redeemCollateral(user, msg.sender, collateral, totalCollateralToRedeem);
+    _redeemCollateral( collateral, totalCollateralToRedeem, user, msg.sender);
     // we need to burn dsc 
     _burnDsc(debtToCover, user, msg.sender);
     uint256 endingUserHealthFactor = _healthFactor(user);
@@ -242,8 +261,14 @@ contract DSCEngine is ReentracyGuard {
       i_dsc.burn(amountDscToBurn);
   }
 
-  function _redeemCollateral(address from, address to, address tokenCollateralAddress, 
-  uint256 amountCollateral ) private {
+  function _redeemCollateral(
+        address tokenCollateralAddress, 
+        uint256 amountCollateral,
+        address from,
+        address to
+     )
+       private 
+  {
     s_collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
     emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
     bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
