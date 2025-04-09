@@ -241,6 +241,9 @@ contract DSCEngine is ReentracyGuard {
     // we need to burn dsc 
     _burnDsc(debtToCover, user, msg.sender);
     uint256 endingUserHealthFactor = _healthFactor(user);
+
+    // after liquidation, the protocol checks if the borrower's health factor has improved
+    // If not, the transaction reverts, ensuring liquidations are always beneficial to the protocol.
     if(endingUserHealthFactor <= startingUserHealthFactor){
       revert DSCEngine__HealthFactorNotImproved();
     }
