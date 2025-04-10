@@ -51,16 +51,20 @@ contract HelperConfig is Script {
           DECIMALS,
           ETH_USD_PRICE
         );
+        // deploys mock chainlink price feed for ETH/USD.
+        // creates a mock ERC-20 token for WETH.
         ERC20Mock wethMock = new ERC20Mock("WETH", "WETH", msg.sender, 1000e8);
 
          MockV3Aggregator btcUsdPriceFeed = new MockV3Aggregator(
           DECIMALS,
-          BTC_USD_PRICE
+          BTC_USD_PRICE 
         );
+        // Creates a mock ERC-20 token for WBTC
         ERC20Mock wbtcMock = new ERC20Mock("WBTC", "WBTC", msg.sender, 1000e8);
 
         vm.stopBroadcast();
 
+        // Returns the newly created mock contract addresses for local testing
         return NetworkConfig({
             wethUsdPriceFeed: address(ethUsdPriceFeed),
             wbtcUsdPriceFeed: address(btcUsdPriceFeed),
